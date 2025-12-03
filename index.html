@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Выбор офиса — тестовый прототип</title>
+<style>
+  :root{font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial; color:#111}
+  html,body{height:100%;margin:0;background:#f6f7f8}
+  /* контейнер, не дающий выйти за границы */
+  .wrap{
+    box-sizing:border-box;
+    max-width:900px;
+    margin:18px auto;
+    padding:18px;
+    background:#fff;
+    border-radius:10px;
+    box-shadow:0 6px 20px rgba(0,0,0,.07);
+    min-height:calc(100vh - 36px);
+    overflow:hidden; /* важное правило — ничего не выходит */
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
+
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  header h1{font-size:18px;margin:0}
+  header p{margin:0;color:#666;font-size:13px}
+
+  .controls{display:flex;gap:8px;flex-wrap:wrap}
+  button, .btn {
+    background:#0b67ff;color:#fff;border:0;padding:8px 12px;border-radius:8px;font-weight:600;
+    cursor:pointer;
+  }
+  button.ghost{background:transparent;color:#0b67ff;border:1px solid #cfe0ff}
+  button.small{padding:6px 8px;font-size:13px}
+  .flex{display:flex;gap:12px;align-items:center}
+
+  main{display:flex;gap:12px;flex:1;overflow:hidden}
+  /* левая колонка — список офисов */
+  .col{box-sizing:border-box;padding:10px;border-radius:8px;background:#fbfcff;overflow:auto}
+  .left{flex:1;min-width:240px;max-width:420px; height:100%}
+  .right{flex:1;min-width:240px; height:100%}
+
+  ul.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+  li.office{display:flex;flex-direction:column;gap:6px;padding:10px;border-radius:8px;border:1px solid #eef3ff;cursor:pointer}
+  li.office:hover{box-shadow:0 3px 10px rgba(11,103,255,0.06)}
+  .meta{font-size:13px;color:#444}
+  .addr{font-size:12px;color:#666}
+  .schedule{font-size:13px;color:#0b67ff;font-weight:600}
+
+  .selectedBadge{background:#e8f0ff;color:#0b67ff;padding:4px 8px;border-radius:999px;font-size:12px;display:inline-block}
+  .footer{display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid #f0f3ff;font-size:13px;color:#666}
+
+  textarea#importArea{width:100%;height:120px;border:1px dashed #dfeaff;padding:8px;border-radius:8px;resize:vertical;font-family:monospace}
+  .hint{font-size:13px;color:#666}
+  .controls-bottom{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+  /* мобильная адаптация */
+  @media (max-width:720px){
+    .wrap{margin:8px;padding:12px;border-radius:8px}
+    main{flex-direction:column}
+    .left,.right{max-height:40vh}
+  }
+
+  /* гарантирует, что никакой элемент не выходит по горизонтали */
+  *{max-width:100%}
+</style>
+</head>
+<body>
+<div class="wrap" role="application" aria-label="Выбор офиса и сохранение профиля">
+  <header>
+    <div>
+      <h1>Выберите офис — тестовый прототип</h1>
+      <p>Берём список офисов и график работы (источник: bspb.ru) — вставь HTML со страницы в поле импорта.</p>
+    </div>
+    <div class="flex">
+      <div id="currentLabel"></div>
+      <button class="ghost small" id="resetBtn">Сброс</button>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button id="loadSample" class="small">Загрузить пример</button>
+    <button id="importBtn" class="small ghost">Парсер из вставленного HTML</button>
+    <button id="downloadBtn" class="small">Экспорт JSON</button>
+    <button id="clearStorage" class="small ghost">Очистить localStorage</button>
+  </div>
+
+  <main>
+    <section class="col left" aria-label="Список офисов">
+      <h3 style="margin:0 0 8px 0">Офисы</h3>
+      <div class="hint">Нажми на офис чтобы выбрать. Список загружается из примера или из парсера.</div>
+      <ul class="list" id="officeList" role="list"></ul>
+      <div style="margin-top:10px" class="controls-bottom">
+        <button id="saveProfile" class="btn small">Сохранить выбор</button>
+        <div id="savedMsg" style="color:#0b67ff;font-weight:700;display:none">Сохранено ✅</div>
+      </div>
+    </section>
+
+    <section class="col right" aria-label="Импорт и профиль">
+      <h3 style="margin:0 0 8px 0">Импорт (вставь HTML со страницы)</h3>
+      <textarea id="importArea" placeholder="Вставь сюда HTML страницы https://www.bspb.ru/map?is=offices&type=private и нажми «Парсер из вставленного HTML»"></textarea>
+      <div style="margin-top:8px" class="hint">Парсер ищет названия и текст с часами работы. Если данные распарсились — появятся в списке.</div>
+
+      <hr style="border:none;border-top:1px solid #f0f3ff;margin:12px 0" />
+      <h3 style="margin:0 0 8px 0">Текущий профиль</h3>
+      <div id="profileCard" style="display:flex;flex-direction:column;gap:8px">
+        <div><strong id="profileName">—</strong></div>
+        <div class="addr" id="profileAddr">—</div>
+        <div class="schedule" id="profileSched">—</div>
+      </div>
+    </section>
+  </main>
+
+  <div class="footer">
+    <div>Прототип — single HTML. Интерфейс гарантированно в границах экрана.</div>
+    <div style="text-align:right">
+      <small style="color:#999">Тестовая версия</small>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ====== Данные и логика ====== */
+
+/* sampleData — демонстрационный набор, чтобы протестировать без вставки */
+const sampleData = [
+  {name: "Доп. офис «Лахта»", address: "ул. Савушкина, 124 корп.1, Санкт-Петербург", schedule: "Пн–Пт 10:00-19:00"},
+  {name: "Отделение Большая Московская", address: "ул. Большая Московская, 12", schedule: "Пн–Сб 09:00-18:00"},
+  {name: "Доп. офис «Центр»", address: "Невский пр., 20", schedule: "Пн–Пт 10:00-18:00, Сб 10:00-15:00"},
+  {name: "Отделение Приморская", address: "пр. Энгельса, 45", schedule: "Пн–Пт 09:30-18:30"},
+  {name: "Доп. офис «Ковалёвская»", address: "ул. Ковалёвская, 7", schedule: "Пн–Пт 10:00-19:00"}
+];
+
+const officeListEl = document.getElementById('officeList');
+const profileName = document.getElementById('profileName');
+const profileAddr = document.getElementById('profileAddr');
+const profileSched = document.getElementById('profileSched');
+const currentLabel = document.getElementById('currentLabel');
+const savedMsg = document.getElementById('savedMsg');
+
+let offices = []; // текущий массив офисов
+let selectedIndex = null;
+
+/* отрисовка списка */
+function renderList(){
+  officeListEl.innerHTML = '';
+  offices.forEach((o,idx) => {
+    const li = document.createElement('li');
+    li.className = 'office';
+    li.tabIndex = 0;
+    li.dataset.idx = idx;
+    li.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-weight:700" class="meta">${escapeHtml(o.name)}</div>
+        ${selectedIndex===idx ? '<span class="selectedBadge">Выбран</span>' : ''}
+      </div>
+      <div class="addr">${escapeHtml(o.address||'—')}</div>
+      <div class="schedule">${escapeHtml(o.schedule||'—')}</div>
+    `;
+    li.addEventListener('click', ()=> { selectOffice(idx); });
+    li.addEventListener('keydown', (e)=>{ if(e.key==='Enter') selectOffice(idx); });
+    officeListEl.appendChild(li);
+  });
+}
+
+/* выбор офиса */
+function selectOffice(idx){
+  selectedIndex = idx;
+  const o = offices[idx];
+  profileName.textContent = o.name;
+  profileAddr.textContent = o.address || '—';
+  profileSched.textContent = o.schedule || '—';
+  currentLabel.innerHTML = `<div class="selectedBadge">Офис: ${escapeHtml(o.name)}</div>`;
+  savedMsg.style.display = 'none';
+  renderList();
+}
+
+/* сохранить профиль в localStorage */
+function saveProfile(){
+  if(selectedIndex==null) return alert('Выберите офис перед сохранением.');
+  const payload = {
+    selected_office: offices[selectedIndex],
+    saved_at: new Date().toISOString()
+  };
+  localStorage.setItem('bspb_profile', JSON.stringify(payload));
+  savedMsg.style.display = 'inline-block';
+  setTimeout(()=> savedMsg.style.display = 'none', 2200);
+}
+
+/* загрузить профиль из localStorage */
+function loadProfile(){
+  const raw = localStorage.getItem('bspb_profile');
+  if(!raw) return;
+  try{
+    const p = JSON.parse(raw);
+    if(p?.selected_office){
+      // попытаться найти индекс в текущих офисах по имени+адресу
+      const idx = offices.findIndex(o => o.name===p.selected_office.name && o.address===p.selected_office.address);
+      if(idx>=0) {
+        selectOffice(idx);
+      } else {
+        // добавим временно в начало списка
+        offices.unshift(p.selected_office);
+        selectOffice(0);
+        renderList();
+      }
+    }
+  }catch(e){ console.warn('Ошибка парсинга профиля',e) }
+}
+
+/* экспорт в файл */
+function exportJSON(){
+  const raw = localStorage.getItem('bspb_profile') || JSON.stringify({selected_office:null});
+  const blob = new Blob([raw],{type:'application/json;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'bspb_profile.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=> URL.revokeObjectURL(url),5000);
+}
+
+/* очистка localStorage */
+function clearStorage(){
+  if(confirm('Очистить сохранённый профиль?')) {
+    localStorage.removeItem('bspb_profile');
+    profileName.textContent = '—';
+    profileAddr.textContent = '—';
+    profileSched.textContent = '—';
+    currentLabel.innerHTML = '';
+    savedMsg.style.display = 'none';
+    alert('localStorage очищен.');
+  }
+}
+
+/* импорт примера */
+document.getElementById('loadSample').addEventListener('click', ()=>{
+  offices = JSON.parse(JSON.stringify(sampleData));
+  selectedIndex = null;
+  renderList();
+  loadProfile();
+});
+
+/* сохранить */
+document.getElementById('saveProfile').addEventListener('click', saveProfile);
+
+/* экспорт */
+document.getElementById('downloadBtn').addEventListener('click', exportJSON);
+
+/* очистка LS */
+document.getElementById('clearStorage').addEventListener('click', clearStorage);
+
+/* сброс списка (полностью) */
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  if(confirm('Сбросить список офисов к пустому состоянию?')) {
+    offices = []; selectedIndex = null;
+    renderList();
+    profileName.textContent = '—';
+    profileAddr.textContent = '—';
+    profileSched.textContent = '—';
+    currentLabel.innerHTML = '';
+  }
+});
+
+/* ===== Парсер вставленного HTML =====
+   Подход: ищем повторяющиеся блоки, содержащие название и текст-расписание.
+   Алгоритм простой и надёжный для теста:
+   - Убираем лишние переносы
+   - Ищем все строки, содержащие слова "Пн" или "Пон" или "время" + часы
+   - Берём ближайшие 2–3 текстовых фрагмента вверх для имени и адреса
+   (это эвристика — для 100% стабильности нужен доступ к реальному DOM страницы)
+*/
+function parseHtmlForOffices(html){
+  // очистка от скриптов
+  const cleaned = html.replace(/<script[\s\S]*?<\/script>/gi,' ').replace(/<!--[\s\S]*?-->/g,' ');
+  // простая замена тэгов на разделители для извлечения текстовых блоков
+  const text = cleaned.replace(/<\s*br\s*\/?>/gi,'\n')
+                      .replace(/<\/(div|li|p|section|h[1-6]|td)>/gi,'\n')
+                      .replace(/<[^>]+>/g,' ')
+                      .replace(/\s{2,}/g,' ')
+                      .trim();
+  // разобьём на строки по переносам
+  const lines = text.split(/\n+/).map(l => l.trim()).filter(Boolean);
+  const candidates = [];
+  // находим строки содержащие дни недели/время
+  const schedRe = /(?:Пн|Пон|Вт|Вт\\.|Ср|Чт|Пт|Сб|Вс|Вск|выходн|режим|работа|работает).*?\d{1,2}[:.]\d{2}/i;
+  // также ищем короткие шаблоны типа "09:00-18:00", "10:00-19:00"
+  const timeRe = /\d{1,2}[:.]\d{2}\s*[-\-–]\s*\d{1,2}[:.]\d{2}/;
+  for(let i=0;i<lines.length;i++){
+    const L = lines[i];
+    if(schedRe.test(L) || timeRe.test(L)){
+      // возьмём 2 предыдущие строки как имя/адрес (если есть)
+      const name = lines[i-2] || lines[i-1] || 'Без названия';
+      const addr = lines[i-1] || '';
+      candidates.push({
+        name: name,
+        address: addr,
+        schedule: L
+      });
+    }
+  }
+  // удалим дубликаты по имени+адрес
+  const uniq = [];
+  const seen = new Set();
+  for(const c of candidates){
+    const key = (c.name+'||'+c.address).trim();
+    if(!seen.has(key)){
+      uniq.push({
+        name: c.name.trim(),
+        address: c.address.trim(),
+        schedule: c.schedule.trim()
+      });
+      seen.add(key);
+    }
+  }
+  return uniq;
+}
+
+/* парсер по кнопке */
+document.getElementById('importBtn').addEventListener('click', ()=>{
+  const html = document.getElementById('importArea').value;
+  if(!html.trim()) return alert('Вставь HTML страницы в поле для импорта.');
+  const parsed = parseHtmlForOffices(html);
+  if(parsed.length===0){
+    if(!confirm('Не удалось автоматически найти расписания. Хотите загрузить как единичный пункт (имя = весь текст заголовка)?')) return;
+    // fallback — взять первые 5 строк как единичный офис
+    const txt = html.replace(/<[^>]+>/g,' ').replace(/\s{2,}/g,' ').trim().slice(0,400);
+    offices = [{name: 'Импорт (fallback)', address: '', schedule: txt}];
+  } else {
+    offices = parsed;
+  }
+  selectedIndex = null;
+  renderList();
+  loadProfile();
+  alert('Импорт завершён. Найдено офисов: ' + offices.length);
+});
+
+/* утилиты */
+function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* инициализация — пустой список */
+offices = [];
+renderList();
+loadProfile();
+
+</script>
+</body>
+</html>
