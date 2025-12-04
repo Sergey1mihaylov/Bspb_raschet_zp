@@ -2,574 +2,487 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>ЗП — Календарь и Зарплата</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>ЗП — Банк Санкт-Петербург (мини-приложение)</title>
 <style>
-  :root{--accent:#d90000;--bg:#f6f7fb;--card:#fff;--muted:#566;}
+  :root{
+    --bg:#0f1720;
+    --panel:#0b1220;
+    --accent:#0ea5a4;
+    --muted:#9aa6b2;
+    --card:#0f1b27;
+    --glass: rgba(255,255,255,0.03);
+    --radius:12px;
+    --gap:10px;
+    --header-h:56px;
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    color-scheme: dark;
+  }
+  /* strict no overflow */
+  html,body{height:100%;margin:0;padding:0;overflow:hidden;background:linear-gradient(180deg,#08101a,#071018);}
   *{box-sizing:border-box}
-  html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial;background:var(--bg);color:#111;}
-  .app{max-width:1100px;margin:8px auto;padding:8px;min-height:100vh;display:flex;flex-direction:column;gap:8px;overflow:hidden}
-  header{position:sticky;top:0;background:transparent;z-index:40}
-  .top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 4px}
-  .logo{width:44px;height:44px;border-radius:8px;background:linear-gradient(180deg,var(--accent),#ff6b6b);display:flex;align-items:center;justify-content:center;color:white;font-weight:700}
-  .title{font-weight:700}
-  .staticHeader{background:var(--card);padding:10px;border-radius:10px;box-shadow:0 8px 20px rgba(2,6,23,0.06);display:flex;justify-content:space-between;align-items:center;gap:12px;position:sticky;top:60px;z-index:30}
-  .staticLeft{display:flex;align-items:center;gap:12px}
-  .nameDisplay{font-weight:700}
-  .controls{display:flex;gap:8px;align-items:center}
-  button{cursor:pointer;border:0;padding:8px 10px;border-radius:8px;background:var(--accent);color:white;font-weight:700}
-  button.ghost{background:transparent;border:1px solid rgba(0,0,0,0.06);color:var(--accent);font-weight:600}
-  .content{flex:1;overflow:auto;padding:10px}
-  .page{display:none}
-  .page.active{display:block}
+
+  /* app container fits exactly viewport */
+  .app{
+    height:100vh; width:100vw;
+    display:flex; flex-direction:column;
+    gap:var(--gap); padding:12px;
+    align-items:stretch;
+  }
+
+  /* header */
+  .top{
+    height:var(--header-h);
+    display:flex; align-items:center; gap:12px;
+  }
+  .logo{
+    display:flex; align-items:center; gap:10px;
+    color:var(--accent); font-weight:600;
+  }
+  .tabs{
+    margin-left:auto; display:flex; gap:8px;
+  }
+  .tab-btn{
+    background:var(--glass); border:1px solid rgba(255,255,255,0.03);
+    padding:8px 12px; border-radius:10px; color:var(--muted); cursor:pointer; font-weight:600;
+  }
+  .tab-btn.active{background:linear-gradient(90deg, rgba(14,165,164,0.14), rgba(14,165,164,0.06)); color:var(--accent); box-shadow:0 4px 18px rgba(0,0,0,0.6);}
+
+  /* content area fills remaining space */
+  .content{
+    flex:1 1 auto;
+    display:flex; gap:12px; align-items:stretch;
+    min-height:0; /* important for flex children overflow handling */
+  }
+
+  /* left column (profile) and right column (salary) are narrow, calendar center is flexible */
+  .col{
+    background:var(--panel); border-radius:var(--radius); padding:12px;
+    box-shadow: 0 6px 24px rgba(2,6,23,0.6);
+    overflow:auto; /* internal scroll if needed */
+  }
+  .col.profile{width:280px; min-width:220px; max-width:340px;}
+  .col.calendar{flex:1 1 auto; min-width:0;} /* min-width:0 to allow shrinking */
+  .col.salary{width:280px; min-width:200px; max-width:340px; display:flex; flex-direction:column; justify-content:center; align-items:center;}
+
+  /* profile layout */
+  .avatar-wrap{display:flex; gap:12px; align-items:center}
+  .avatar{
+    width:84px; height:84px; border-radius:14px; background:linear-gradient(180deg,#0b1620,#051016); display:flex; align-items:center; justify-content:center; overflow:hidden;
+    border:1px solid rgba(255,255,255,0.04);
+  }
+  .avatar img{width:100%; height:100%; object-fit:cover; display:block}
+  .input{display:flex; flex-direction:column; gap:6px; margin-top:10px}
+  .input label{font-size:12px; color:var(--muted)}
+  .input input, .input select{
+    background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.03); padding:8px 10px; border-radius:8px; color:#dfe9ee;
+    font-size:14px;
+  }
+  .save-btn{margin-top:12px; padding:10px; width:100%; border-radius:10px; background:var(--accent); color:#05282a; font-weight:700; cursor:pointer; border:none;}
 
   /* calendar */
-  .calWrap{background:var(--card);padding:12px;border-radius:10px;box-shadow:0 6px 18px rgba(2,6,23,0.06)}
-  .calHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-  .calGrid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
-  .weekday{text-align:center;color:var(--muted);font-size:13px}
-  .day{background:linear-gradient(180deg,#fff,#fbfdff);border-radius:8px;min-height:60px;display:flex;align-items:flex-start;justify-content:center;padding:8px;font-weight:700;cursor:pointer;border:1px solid #eef2f7}
-  .day.small{min-height:48px;font-size:14px}
-  .day:active{transform:scale(.997)}
+  .cal-header{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px}
+  .month-title{font-weight:700; color:#d6eef0}
+  .month-controls{display:flex; gap:8px}
+  .btn-mini{padding:6px 8px; border-radius:8px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.03); color:var(--muted); cursor:pointer}
+
+  .weekdays, .dates{
+    display:grid; grid-template-columns:repeat(7, 1fr); gap:6px;
+  }
+  .weekday{
+    text-align:center; font-size:12px; color:var(--muted); padding:6px 0;
+  }
+  /* dates grid: each cell same width as weekday above because same grid columns */
+  .date-cell{
+    height:64px; border-radius:8px; background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.015));
+    display:flex; align-items:flex-start; justify-content:flex-end; padding:6px; color:#cfe8ea; font-weight:600; cursor:pointer; user-select:none;
+    border:1px solid rgba(255,255,255,0.02);
+  }
+  .date-cell:hover{box-shadow:0 8px 18px rgba(2,6,23,0.6)}
+  .date-number{font-size:14px; color:#e6f6f6}
+
   /* modal */
-  .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);display:none;align-items:center;justify-content:center;padding:12px;z-index:70}
-  .overlay.show{display:flex}
-  .modal{background:var(--card);border-radius:10px;padding:12px;max-width:920px;width:100%;max-height:90vh;overflow:auto;box-shadow:0 16px 40px rgba(2,6,23,0.3)}
-  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
-  .tab{padding:8px 10px;border-radius:8px;background:#f3f6fb;border:1px solid #e8eefc;cursor:pointer;font-weight:700}
-  .tab.active{background:linear-gradient(90deg,#eef7ff,#fff);border-color:rgba(11,102,255,0.18)}
-  .sublist{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px}
-  .subitem{background:#fbfdff;border:1px solid #eef6ff;padding:8px;border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:8px}
-  input[type="number"], select, input[type="text"]{padding:8px;border:1px solid #e6e9ef;border-radius:6px;font-size:14px;background:white;width:100%}
-  .footer{display:flex;justify-content:space-between;gap:8px;margin-top:12px}
+  .modal{
+    position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.45); z-index:50;
+  }
+  .modal.open{display:flex}
+  .modal-card{
+    width:min(680px, 94vw); max-height:86vh; overflow:auto; background:var(--card); padding:16px; border-radius:12px; border:1px solid rgba(255,255,255,0.03);
+  }
+  .sales-list{display:flex; flex-direction:column; gap:8px; margin-top:12px}
+  .sale-item{padding:8px; border-radius:8px; background:rgba(255,255,255,0.02); display:flex; justify-content:space-between; gap:8px}
 
-  /* salary page */
-  .salaryCard{background:var(--card);padding:12px;border-radius:10px;box-shadow:0 6px 18px rgba(2,6,23,0.06)}
-  .row{display:flex;gap:8px;align-items:center}
-  .rates{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-bottom:12px}
-  table{width:100%;border-collapse:collapse}
-  th,td{padding:8px;border-bottom:1px solid #efefef;text-align:left}
-  .small{font-size:13px;color:var(--muted)}
-  .controlsRow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+  /* footer hint */
+  .hint{font-size:12px; color:var(--muted); margin-top:10px; text-align:center}
 
-  /* bottom nav */
-  .bottomNav{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);display:flex;gap:8px;padding:8px;background:var(--card);border-radius:999px;box-shadow:0 8px 30px rgba(2,6,23,0.12);z-index:80}
-  .navBtn{padding:10px 14px;border-radius:999px;border:0;background:transparent;color:var(--accent);font-weight:800}
-  .navBtn.active{background:linear-gradient(90deg,var(--accent),#ff6b6b);color:white}
-
-  /* responsive & safety */
-  @media (max-width:700px){ .day{min-height:48px} .modal{max-width:95vw} .staticHeader{flex-direction:column;align-items:flex-start} }
-  html,body{overflow-x:hidden}
+  /* ensure no horizontal overflow */
+  .app, .content, .col, .modal-card {max-width:100vw; box-sizing:border-box}
 </style>
 </head>
 <body>
-  <div class="app" role="application">
-    <header>
-      <div class="top">
-        <div style="display:flex;align-items:center;gap:12px">
-          <div class="logo">ЗП</div>
-          <div>
-            <div class="title">Расчёт продаж — локально</div>
-            <div class="small">Данные хранятся только на устройстве</div>
-          </div>
-        </div>
-        <div class="controls">
-          <button id="exportAll" class="ghost">Экспорт JSON</button>
-          <button id="importAll" class="ghost">Импорт JSON</button>
-          <input id="importFile" type="file" accept="application/json" style="display:none">
-        </div>
-      </div>
-
-      <div class="staticHeader">
-        <div class="staticLeft">
-          <div>
-            <div class="nameDisplay" id="nameDisplay">—</div>
-            <!-- removed labels as requested -->
-          </div>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <select id="officeSelect" style="min-width:220px"></select>
-          <button id="editName" class="ghost">Изменить</button>
-        </div>
-      </div>
-    </header>
-
-    <div class="content">
-      <!-- CALENDAR PAGE -->
-      <section id="pageCalendar" class="page active">
-        <div class="calWrap">
-          <div class="calHead">
-            <div style="display:flex;gap:8px;align-items:center">
-              <button id="prevMonth" class="ghost">&larr;</button>
-              <div id="monthLabel" class="small"></div>
-              <button id="nextMonth" class="ghost">&rarr;</button>
-            </div>
-            <div class="small">Нажми на число — добавить продажу</div>
-          </div>
-
-          <div class="calGrid" id="weekdays"></div>
-          <div class="calGrid" id="calendar"></div>
-        </div>
-      </section>
-
-      <!-- SALARY PAGE -->
-      <section id="pageSalary" class="page">
-        <div class="salaryCard">
-          <h3>Расчёт зарплаты</h3>
-
-          <div class="controlsRow">
-            <label class="small">Период:</label>
-            <input type="date" id="fromDate">
-            <input type="date" id="toDate">
-            <label class="small">Категория:</label>
-            <select id="filterCat"><option value="all">Все</option></select>
-            <label class="small">Офис:</label>
-            <select id="filterOffice"><option value="all">Все</option></select>
-          </div>
-
-          <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
-            <div style="flex:1">
-              <div class="small">Ставки (руб. за 1 продажу) — редактируемые</div>
-              <div class="rates" id="ratesContainer"></div>
-            </div>
-            <div style="width:220px">
-              <div class="small">Итог</div>
-              <div style="font-size:22px;font-weight:800" id="salaryTotal">0 ₽</div>
-              <button id="saveCalc" style="width:100%;margin-top:8px">Сохранить расчёт</button>
-              <button id="exportCSV" class="ghost" style="width:100%;margin-top:8px">Экспорт CSV</button>
-            </div>
-          </div>
-
-          <div>
-            <table aria-live="polite">
-              <thead>
-                <tr><th>Категория</th><th>Подтип</th><th>Кол-во</th><th>Ставка, ₽</th><th>Сумма, ₽</th></tr>
-              </thead>
-              <tbody id="salaryBody"></tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
+<div class="app" id="app">
+  <div class="top">
+    <div class="logo">ЗП • БСПБ</div>
+    <div class="tabs" role="tablist" aria-label="Вкладки">
+      <button class="tab-btn active" data-tab="profile">Профиль</button>
+      <button class="tab-btn" data-tab="calendar">Календарь</button>
+      <button class="tab-btn" data-tab="salary">Зарплата</button>
     </div>
-
-    <!-- bottom nav -->
-    <div class="bottomNav" role="navigation">
-      <button id="navCal" class="navBtn active">Календарь</button>
-      <button id="navSal" class="navBtn">Зарплата</button>
-    </div>
-
-    <!-- Modal for day input -->
-    <div class="overlay" id="overlay" aria-modal="true" role="dialog">
-      <div class="modal" role="document">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div><div id="modalTitle" style="font-weight:800"></div><div class="small" id="modalMeta"></div></div>
-          <div><button id="closeModal" class="ghost">Закрыть</button></div>
-        </div>
-
-        <div class="tabs" id="categoryTabs" role="tablist"></div>
-        <div id="sublist" class="sublist"></div>
-
-        <div style="display:flex;gap:8px;margin-top:10px">
-          <input type="number" id="inputQty" min="1" placeholder="Количество">
-          <button id="addEntry">Добавить</button>
-        </div>
-
-        <div class="footer">
-          <div class="small" id="entriesCount">Итого: 0</div>
-          <div style="display:flex;gap:8px">
-            <button id="clearDay" class="ghost">Очистить</button>
-            <button id="saveDay">Готово</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
   </div>
 
+  <div class="content">
+    <div class="col profile" id="profileCol">
+      <div style="font-weight:700;color:#dff7f6">Профиль</div>
+      <div class="avatar-wrap" style="margin-top:12px">
+        <div class="avatar" id="avatarPreview">
+          <span style="color:var(--muted);font-size:12px">Аватар</span>
+        </div>
+        <div style="flex:1">
+          <div class="input">
+            <label>Фамилия</label>
+            <input id="surname" type="text" placeholder="Иванов" />
+          </div>
+          <div class="input" style="margin-top:8px">
+            <label>Имя</label>
+            <input id="name" type="text" placeholder="Иван" />
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:12px">
+        <div class="input">
+          <label>Аватар (загрузить)</label>
+          <input id="avatarInput" type="file" accept="image/*" />
+        </div>
+
+        <div class="input" style="margin-top:8px">
+          <label>Должность</label>
+          <select id="positionSelect"></select>
+        </div>
+
+        <div class="input" style="margin-top:8px">
+          <label>Офис</label>
+          <select id="officeSelect"></select>
+        </div>
+
+        <button class="save-btn" id="saveProfile">Сохранить профиль</button>
+        <div class="hint">Данные сохраняются локально в браузере</div>
+      </div>
+    </div>
+
+    <div class="col calendar" id="calendarCol">
+      <div class="cal-header">
+        <div class="month-title" id="monthTitle">Месяц</div>
+        <div class="month-controls">
+          <button class="btn-mini" id="prevMonth">&larr;</button>
+          <button class="btn-mini" id="nextMonth">&rarr;</button>
+          <button class="btn-mini" id="todayBtn">Сегодня</button>
+        </div>
+      </div>
+
+      <div class="weekdays" id="weekdays">
+        <!-- weekdays will be injected -->
+      </div>
+
+      <div class="dates" id="datesGrid" aria-label="Календарь">
+        <!-- dates will be injected -->
+      </div>
+    </div>
+
+    <div class="col salary" id="salaryCol">
+      <div style="font-weight:700;color:#dff7f6">Зарплата</div>
+      <div style="margin-top:12px;color:var(--muted)">Вкладка пока в разработке</div>
+    </div>
+  </div>
+</div>
+
+<!-- modal for day's sales -->
+<div class="modal" id="modal">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div id="modalTitle" style="font-weight:700;color:#dff7f6">Продажи — <span id="modalDate"></span></div>
+        <div style="font-size:13px;color:var(--muted)">Список продаж за выбранный день</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-mini" id="addSaleBtn">Добавить продажу</button>
+        <button class="btn-mini" id="closeModal">Закрыть</button>
+      </div>
+    </div>
+
+    <div class="sales-list" id="salesList">
+      <!-- items -->
+    </div>
+  </div>
+</div>
+
+<script src="prices.js"></script>
 <script>
-/* =================== DATA MODEL =================== */
-const CATEGORIES = {
-  "КК": ["Рассм.","заявка","сплит"],
-  "ПК": ["Заявка","выдача"],
-  "ТА": ["Яркая","Другие","ЕКП","МА"],
-  "Накопит": ["Вклад","НС.","МА выдача","СМС","Лид ЦПО","Лид Ипотека"],
-  "ПЕНС": ["Военный","Страховая"],
-  "Страховки": []
-};
+/*
+  index.html logic
+  - Uses global PRICES from prices.js
+  - Persists profile and sales in localStorage
+  - Calendar: grid with exact 7 columns; weekdays header and dates aligned via same grid columns
+*/
 
-// storage keys
-const KEY_USER = "zp_user_v2";
-const KEY_OFFICES = "zp_offices_v2";
-const KEY_SALES_PREFIX = "sales_"; // sales_YYYY-M-D
-const KEY_RATES = "zp_rates_v2";
-const KEY_SAVED_CALCS = "zp_saved_calcs_v2";
-
-/* =================== UTIL =================== */
-function q(id){return document.getElementById(id)}
-function isoDate(d){ const y=d.getFullYear(), m=(d.getMonth()+1).toString().padStart(2,'0'), day=(d.getDate()).toString().padStart(2,'0'); return `${y}-${m}-${day}` }
-function parseIso(s){ return new Date(s); }
-function loadJSON(key, fallback){try{const v=localStorage.getItem(key);return v?JSON.parse(v):fallback}catch(e){return fallback}}
-function saveJSON(key,obj){localStorage.setItem(key,JSON.stringify(obj))}
-
-/* =================== INIT USER / OFFICES =================== */
-let user = loadJSON(KEY_USER, {name:"", office:""});
-let offices = loadJSON(KEY_OFFICES, ["Центральный","Коммерческий деп. 1","Коммерческий деп. 2","ДО \"Северный\""]);
-
-function ensureUser() {
-  if(!user.name){
-    const name = prompt("Введите ФИО:") || "Пользователь";
-    user.name = name.trim();
-  }
-  if(!user.office){
-    user.office = offices[0] || "Центральный";
-  }
-  saveJSON(KEY_USER, user);
+// safety: if PRICES not present, set defaults
+if (typeof PRICES === 'undefined') {
+  window.PRICES = { positions: {"СЭ":{base:0},"АЗ":{base:0}}, offices: ['ДО "Центральный"'], currency:'₽' };
 }
-ensureUser();
 
-/* render header/office select */
-function renderHeader(){
-  q('nameDisplay').textContent = `${user.name} | ${user.office}`;
-  const sel = q('officeSelect');
-  sel.innerHTML = "";
-  offices.forEach(o=>{
-    const opt=document.createElement('option'); opt.value=o; opt.textContent=o; sel.appendChild(opt);
-  });
-  sel.value = user.office || offices[0];
+const el = id => document.getElementById(id);
+
+// Tabs
+const tabs = document.querySelectorAll('.tab-btn');
+tabs.forEach(btn => btn.addEventListener('click', ()=> {
+  tabs.forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const tab = btn.dataset.tab;
+  showTab(tab);
+}));
+
+function showTab(tab){
+  el('profileCol').style.display = tab === 'profile' ? 'block' : 'none';
+  el('calendarCol').style.display = tab === 'calendar' ? 'block' : 'none';
+  el('salaryCol').style.display = tab === 'salary' ? 'flex' : 'none';
 }
-renderHeader();
-q('officeSelect').addEventListener('change', ()=>{
-  user.office = q('officeSelect').value; saveJSON(KEY_USER,user); renderHeader();
-});
-q('editName').addEventListener('click', ()=>{
-  const v = prompt("Фамилия и имя:", user.name||"") || user.name;
-  user.name = v.trim(); saveJSON(KEY_USER,user); renderHeader();
-});
 
-/* import/export JSON */
-q('exportAll').addEventListener('click', ()=>{
-  // gather sales keys
-  const pack = { user, offices, rates: loadJSON(KEY_RATES, {}), savedCalcs: loadJSON(KEY_SAVED_CALCS, {}) , sales:{} };
-  Object.keys(localStorage).forEach(k=>{
-    if(k.startsWith(KEY_SALES_PREFIX)) pack.sales[k] = JSON.parse(localStorage.getItem(k));
+// default
+showTab('profile');
+
+/* PROFILE */
+const surnameInput = el('surname'), nameInput = el('name');
+const avatarInput = el('avatarInput'), avatarPreview = el('avatarPreview');
+const positionSelect = el('positionSelect'), officeSelect = el('officeSelect'), saveProfileBtn = el('saveProfile');
+
+function populateSelects(){
+  // positions from PRICES
+  positionSelect.innerHTML = '';
+  Object.keys(PRICES.positions||{}).forEach(k=>{
+    const opt = document.createElement('option'); opt.value = k; opt.textContent = k; positionSelect.appendChild(opt);
   });
-  const blob = new Blob([JSON.stringify(pack,null,2)],{type:'application/json'});
-  const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`zp-export-${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(a); a.click(); a.remove();
-});
-q('importAll').addEventListener('click', ()=> q('importFile').click());
-q('importFile').addEventListener('change', async (ev)=>{
-  const f = ev.target.files[0]; if(!f) return;
+  // offices, ensure ДО "Центральный" first (PRICES already specified in that order)
+  officeSelect.innerHTML = '';
+  (PRICES.offices||[]).forEach(o=>{
+    const opt = document.createElement('option'); opt.value = o; opt.textContent = o; officeSelect.appendChild(opt);
+  });
+}
+populateSelects();
+
+function loadProfile(){
   try{
-    const txt = await f.text(); const obj = JSON.parse(txt);
-    if(obj.user) { user = obj.user; saveJSON(KEY_USER,user); renderHeader(); }
-    if(obj.offices) { offices = obj.offices; saveJSON(KEY_OFFICES,offices); renderHeader(); }
-    if(obj.rates) saveJSON(KEY_RATES,obj.rates);
-    if(obj.sales) {
-      Object.keys(obj.sales).forEach(k=> localStorage.setItem(k, JSON.stringify(obj.sales[k])));
+    const raw = localStorage.getItem('bspb_profile');
+    if(!raw) return;
+    const p = JSON.parse(raw);
+    surnameInput.value = p.surname||'';
+    nameInput.value = p.name||'';
+    positionSelect.value = p.position||positionSelect.options[0]?.value;
+    officeSelect.value = p.office||officeSelect.options[0]?.value;
+    if (p.avatarDataUrl){
+      avatarPreview.innerHTML = '<img src="'+p.avatarDataUrl+'" alt="avatar">';
     }
-    if(obj.savedCalcs) saveJSON(KEY_SAVED_CALCS, obj.savedCalcs);
-    alert('Импорт завершён');
-    renderCalendar(); populateFilters();
-  }catch(e){ alert('Ошибка импорта: '+e.message) }
-  ev.target.value = "";
+  }catch(e){console.error(e)}
+}
+loadProfile();
+
+avatarInput.addEventListener('change', ()=> {
+  const f = avatarInput.files[0];
+  if(!f) return;
+  const r = new FileReader();
+  r.onload = e => {
+    avatarPreview.innerHTML = '<img src="'+e.target.result+'" alt="avatar">';
+    // temporary store in profile draft
+    profileDraft.avatarDataUrl = e.target.result;
+  };
+  r.readAsDataURL(f);
 });
 
-/* =================== CALENDAR =================== */
-const weekdays = ["Пн","Вт","Ср","Чт","Пт","Сб","Вс"];
-const monthNames = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
-const weekHead = q('weekdays');
-weekdays.forEach(w=> { const el=document.createElement('div'); el.className='weekday'; el.textContent=w; weekHead.appendChild(el); });
+const profileDraft = {};
+saveProfileBtn.addEventListener('click', ()=>{
+  const profile = {
+    surname: surnameInput.value.trim(),
+    name: nameInput.value.trim(),
+    position: positionSelect.value,
+    office: officeSelect.value,
+    avatarDataUrl: profileDraft.avatarDataUrl || (avatarPreview.querySelector('img') ? avatarPreview.querySelector('img').src : null)
+  };
+  if (!profile.surname || !profile.name){
+    alert('Заполните Фамилию и Имя');
+    return;
+  }
+  localStorage.setItem('bspb_profile', JSON.stringify(profile));
+  alert('Профиль сохранён локально');
+});
 
-let viewDate = new Date(); // month view
-function startOfMonth(d){return new Date(d.getFullYear(),d.getMonth(),1)}
-function endOfMonth(d){return new Date(d.getFullYear(),d.getMonth()+1,0)}
-q('prevMonth').addEventListener('click', ()=> { viewDate=new Date(viewDate.getFullYear(),viewDate.getMonth()-1,1); renderCalendar(); });
-q('nextMonth').addEventListener('click', ()=> { viewDate=new Date(viewDate.getFullYear(),viewDate.getMonth()+1,1); renderCalendar(); });
+/* CALENDAR */
+// keep internal date pointer
+let current = new Date();
+current.setHours(0,0,0,0);
+
+const monthTitle = el('monthTitle');
+const weekdaysEl = el('weekdays');
+const datesGrid = el('datesGrid');
+
+const WEEKDAY_NAMES = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+
+function buildWeekdays(){
+  weekdaysEl.innerHTML = '';
+  WEEKDAY_NAMES.forEach(d=>{
+    const w = document.createElement('div');
+    w.className = 'weekday';
+    w.textContent = d;
+    weekdaysEl.appendChild(w);
+  });
+}
+buildWeekdays();
+
+function startOfMonth(d){
+  return new Date(d.getFullYear(), d.getMonth(), 1);
+}
+function endOfMonth(d){
+  return new Date(d.getFullYear(), d.getMonth()+1, 0);
+}
+function addMonths(d, n){
+  const res = new Date(d.getFullYear(), d.getMonth()+n, 1);
+  return res;
+}
+function formatYMD(d){
+  const y=d.getFullYear(); const m=('0'+(d.getMonth()+1)).slice(-2); const dd=('0'+d.getDate()).slice(-2);
+  return `${y}-${m}-${dd}`;
+}
 
 function renderCalendar(){
-  const calendarEl = q('calendar');
-  calendarEl.innerHTML = "";
-  q('monthLabel').textContent = `${monthNames[viewDate.getMonth()]} ${viewDate.getFullYear()}`;
-  const first = startOfMonth(viewDate);
-  const firstWeekday = (first.getDay()+6)%7; // Mon=0..Sun=6
-  const daysInMonth = endOfMonth(viewDate).getDate();
-  for(let i=0;i<firstWeekday;i++){ const b=document.createElement('div'); calendarEl.appendChild(b); }
-  for(let d=1; d<=daysInMonth; d++){
-    const date = new Date(viewDate.getFullYear(), viewDate.getMonth(), d);
-    const iso = isoDate(date);
-    const cell = document.createElement('div'); cell.className='day'; if(window.innerWidth<700) cell.classList.add('small');
-    cell.textContent = d; // only number as requested
-    cell.addEventListener('click', ()=> openModalForDate(iso));
-    calendarEl.appendChild(cell);
+  // title
+  const monthName = current.toLocaleString('ru-RU',{month:'long', year:'numeric'});
+  monthTitle.textContent = monthName[0].toUpperCase()+monthName.slice(1);
+
+  // clear grid
+  datesGrid.innerHTML = '';
+
+  // find first day index (we want Monday=0)
+  const first = startOfMonth(current);
+  let firstWeekday = first.getDay(); // 0 Sun .. 6 Sat
+  // convert to Mon=0..Sun=6
+  firstWeekday = (firstWeekday + 6) % 7;
+
+  const daysInMonth = endOfMonth(current).getDate();
+
+  // add empty cells for days before first
+  for(let i=0;i<firstWeekday;i++){
+    const empty = document.createElement('div');
+    empty.className='date-cell';
+    empty.style.background='transparent';
+    empty.style.border='none';
+    datesGrid.appendChild(empty);
+  }
+
+  // add date cells
+  for(let day=1; day<=daysInMonth; day++){
+    const cell = document.createElement('button');
+    cell.type='button';
+    cell.className='date-cell';
+    const dateNum = document.createElement('div');
+    dateNum.className='date-number';
+    dateNum.textContent = day;
+    cell.appendChild(dateNum);
+
+    // accessible date value
+    const d = new Date(current.getFullYear(), current.getMonth(), day);
+    const ymd = formatYMD(d);
+    cell.dataset.date = ymd;
+
+    cell.addEventListener('click', ()=> openDayModal(ymd));
+    datesGrid.appendChild(cell);
+  }
+
+  // ensure total cells is multiple of 7 by adding trailing empty cells
+  const totalCells = datesGrid.children.length;
+  const addTrailing = (7 - (totalCells % 7)) % 7;
+  for(let i=0;i<addTrailing;i++){
+    const empty = document.createElement('div');
+    empty.className='date-cell';
+    empty.style.background='transparent';
+    empty.style.border='none';
+    datesGrid.appendChild(empty);
   }
 }
+
+el('prevMonth').addEventListener('click', ()=> { current = addMonths(current, -1); renderCalendar(); });
+el('nextMonth').addEventListener('click', ()=> { current = addMonths(current, 1); renderCalendar(); });
+el('todayBtn').addEventListener('click', ()=> { current = new Date(); current.setHours(0,0,0,0); renderCalendar(); });
+
 renderCalendar();
-window.addEventListener('resize', ()=> { document.querySelectorAll('.day').forEach(d=> d.classList.toggle('small', window.innerWidth<700)); });
 
-/* =================== MODAL (add entries) =================== */
-const overlay = q('overlay'), modalTitle = q('modalTitle'), modalMeta = q('modalMeta'), categoryTabs = q('categoryTabs'), sublist = q('sublist');
-let currentIso=null;
-let currentWorking = { entries: {} };
+/* MODAL for day */
+const modal = el('modal'), modalDate = el('modalDate'), salesList = el('salesList');
+el('closeModal').addEventListener('click', ()=> modal.classList.remove('open'));
+modal.addEventListener('click', (e)=> { if(e.target===modal) modal.classList.remove('open'); });
 
-function openModalForDate(iso){
-  currentIso = iso;
-  modalTitle.textContent = iso;
-  modalMeta.textContent = `Данные для ${iso}`;
-  overlay.classList.add('show');
-  // build tabs
-  categoryTabs.innerHTML = "";
-  Object.keys(CATEGORIES).forEach((cat,idx)=>{
-    const btn = document.createElement('button'); btn.className='tab'+(idx===0?' active':''); btn.textContent=cat;
-    btn.addEventListener('click', ()=> { categoryTabs.querySelectorAll('.tab').forEach(t=>t.classList.remove('active')); btn.classList.add('active'); renderSublist(cat); });
-    categoryTabs.appendChild(btn);
-  });
-  // load existing
-  const existing = loadJSON(currentIso, { entries: {} });
-  currentWorking = { entries: existing.entries || {} };
-  renderSublist(Object.keys(CATEGORIES)[0]);
-  updateEntriesCount();
+function getSalesForDate(ymd){
+  try{
+    const raw = localStorage.getItem('bspb_sales_'+ymd) || '[]';
+    return JSON.parse(raw);
+  }catch(e){return []}
 }
-function renderSublist(category){
-  sublist.innerHTML = "";
-  const subs = CATEGORIES[category] || [];
-  if(subs.length===0){
-    const box=document.createElement('div'); box.className='subitem';
-    const lbl=document.createElement('label'); lbl.textContent='(нет предустановленных)';
-    const inp=document.createElement('input'); inp.type='number'; inp.min=0; inp.value=(currentWorking.entries[category] && currentWorking.entries[category].__free) || 0;
-    inp.addEventListener('input', ()=> { setQty(category,'__free', Number(inp.value)||0); });
-    box.appendChild(lbl); box.appendChild(inp); sublist.appendChild(box); return;
-  }
-  subs.forEach(sub=>{
-    const box=document.createElement('div'); box.className='subitem';
-    const lbl=document.createElement('label'); lbl.textContent=sub;
-    const inp=document.createElement('input'); inp.type='number'; inp.min=0; inp.value=(currentWorking.entries[category] && (Number(currentWorking.entries[category][sub])||0)) || 0;
-    inp.addEventListener('input', ()=> setQty(category, sub, Number(inp.value)||0));
-    box.appendChild(lbl); box.appendChild(inp); sublist.appendChild(box);
-  });
-}
-function setQty(category, sub, qty){
-  if(!currentWorking.entries[category]) currentWorking.entries[category] = {};
-  currentWorking.entries[category][sub] = qty;
-  updateEntriesCount();
-}
-function updateEntriesCount(){
-  const total = Object.values(currentWorking.entries).reduce((acc,cat)=> {
-    if(typeof cat==='object') acc += Object.values(cat).reduce((a,v)=> a + (Number(v)||0),0);
-    return acc;
-  },0);
-  q('entriesCount').textContent = `Итого: ${total}`;
-}
-q('addEntry').addEventListener('click', ()=>{
-  // if user filled number in inputQty, add to active tab/subtype
-  const qty = Number(q('inputQty').value || 0); if(!qty || qty<1) { alert('Введите кол-во'); return; }
-  const activeTab = categoryTabs.querySelector('.tab.active'); if(!activeTab) return;
-  const cat = activeTab.textContent;
-  // pick first sub if exists
-  const subs = CATEGORIES[cat] || [];
-  const sub = subs.length? subs[0] : '__free';
-  if(!currentWorking.entries[cat]) currentWorking.entries[cat] = {};
-  currentWorking.entries[cat][sub] = (Number(currentWorking.entries[cat][sub])||0) + qty;
-  // sync inputs if visible
-  renderSublist(cat);
-  q('inputQty').value = '';
-  updateEntriesCount();
-});
-q('clearDay').addEventListener('click', ()=>{
-  if(!currentIso) return;
-  if(!confirm('Удалить все продажи за этот день?')) return;
-  localStorage.removeItem(currentIso);
-  currentWorking = { entries:{} };
-  overlay.classList.remove('show');
-  renderCalendar();
-});
-q('saveDay').addEventListener('click', ()=>{
-  if(!currentIso) return;
-  const payload = { name: user.name, office: user.office, savedAt: new Date().toISOString(), entries: currentWorking.entries };
-  localStorage.setItem(currentIso, JSON.stringify(payload));
-  overlay.classList.remove('show');
-  renderCalendar();
-});
-q('closeModal').addEventListener('click', ()=> overlay.classList.remove('show'));
-overlay.addEventListener('click', e=> { if(e.target===overlay) overlay.classList.remove('show'); });
-
-/* =================== SALARY PAGE =================== */
-const pageCalendar = q('pageCalendar'), pageSalary = q('pageSalary');
-q('navCal').addEventListener('click', ()=> { setActivePage('calendar'); });
-q('navSal').addEventListener('click', ()=> { setActivePage('salary'); renderSalaryPage(); });
-
-function setActivePage(name){
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.navBtn').forEach(b=>b.classList.remove('active'));
-  if(name==='calendar'){ pageCalendar.classList.add('active'); q('navCal').classList.add('active'); }
-  else { pageSalary.classList.add('active'); q('navSal').classList.add('active'); }
+function saveSalesForDate(ymd, arr){
+  localStorage.setItem('bspb_sales_'+ymd, JSON.stringify(arr));
 }
 
-/* RATES: load or init */
-let rates = loadJSON(KEY_RATES, null);
-if(!rates){
-  rates = {};
-  Object.keys(CATEGORIES).forEach(cat=>{
-    rates[cat] = {};
-    (CATEGORIES[cat].length? CATEGORIES[cat] : ['__free']).forEach(sub=>{
-      rates[cat][sub] = 500; // default 500 ₽ per sale — reasonable placeholder
+function openDayModal(ymd){
+  modal.classList.add('open');
+  modalDate.textContent = ymd;
+  renderSales(ymd);
+}
+
+function renderSales(ymd){
+  salesList.innerHTML = '';
+  const sales = getSalesForDate(ymd);
+  if(sales.length===0){
+    const empty = document.createElement('div');
+    empty.style.color = 'var(--muted)';
+    empty.textContent = 'Пока нет продаж за этот день';
+    salesList.appendChild(empty);
+  } else {
+    sales.forEach((s,i)=>{
+      const item = document.createElement('div');
+      item.className='sale-item';
+      item.innerHTML = '<div><div style="font-weight:700">'+(s.title||'Продажа')+'</div><div style="font-size:12px;color:var(--muted)">'+(s.note||'')+'</div></div><div style="min-width:80px;text-align:right"><div style="font-weight:800">'+(s.amount||'0')+' '+(PRICES.currency||'₽')+'</div><div style="font-size:12px;color:var(--muted)"><button data-i="'+i+'" style="background:none;border:none;color:var(--muted);cursor:pointer">Удалить</button></div></div>';
+      salesList.appendChild(item);
     });
-  });
-  saveJSON(KEY_RATES, rates);
-}
-
-/* populate rates UI and filters */
-function populateRatesUI(){
-  const container = q('ratesContainer'); container.innerHTML = "";
-  Object.keys(rates).forEach(cat=>{
-    Object.keys(rates[cat]).forEach(sub=>{
-      const wrap = document.createElement('div'); wrap.style.display='flex'; wrap.style.flexDirection='column';
-      const lbl = document.createElement('div'); lbl.textContent = `${cat} — ${sub}`; lbl.style.fontWeight='700';
-      const inp = document.createElement('input'); inp.type='number'; inp.min=0; inp.value = rates[cat][sub];
-      inp.addEventListener('change', ()=> { rates[cat][sub] = Number(inp.value)||0; saveJSON(KEY_RATES,rates); renderSalaryPage(); });
-      wrap.appendChild(lbl); wrap.appendChild(inp); container.appendChild(wrap);
-    });
-  });
-}
-function populateFilters(){
-  const fc = q('filterCat'); fc.innerHTML = '<option value="all">Все</option>';
-  Object.keys(CATEGORIES).forEach(cat=> { const o=document.createElement('option'); o.value=cat; o.textContent=cat; fc.appendChild(o); });
-  const fo = q('filterOffice'); fo.innerHTML = '<option value="all">Все</option>';
-  offices.forEach(o=>{ const opt=document.createElement('option'); opt.value=o; opt.textContent=o; fo.appendChild(opt); });
-}
-populateFilters();
-populateRatesUI();
-
-/* collect sales from localStorage by date range and filters */
-function collectSales(fromIso, toIso, filterCategory='all', filterOffice='all'){
-  // iterate keys in localStorage with format YYYY-MM-DD or sales_... earlier? our calendar saves by iso key directly (currentIso)
-  // Accept both: keys that look like "2025-12-04" and keys starting with "sales_" or any iso-like keys.
-  const items = [];
-  Object.keys(localStorage).forEach(k=>{
-    if(k===KEY_USER || k===KEY_OFFICES || k===KEY_RATES || k===KEY_SAVED_CALCS) return;
-    // pick storages that look like dates or sale keys
-    let isSale = false;
-    let dateKey = null;
-    if(/^\\d{4}-\\d{2}-\\d{2}$/.test(k)){ isSale=true; dateKey=k; }
-    else if(k.startsWith(KEY_SALES_PREFIX)) { isSale=true; dateKey = k.slice(KEY_SALES_PREFIX.length); }
-    else if(k.startsWith('sales_')) { isSale=true; dateKey = k.slice(6); } // legacy
-    if(!isSale) return;
-    try{
-      const payload = JSON.parse(localStorage.getItem(k));
-      const entries = payload.entries || {};
-      const name = payload.name || '';
-      const officeName = payload.office || '';
-      const dateIso = dateKey;
-      const dateObj = new Date(dateIso);
-      if(isNaN(dateObj)) return;
-      if(fromIso && dateIso < fromIso) return;
-      if(toIso && dateIso > toIso) return;
-      if(filterOffice!=='all' && officeName!==filterOffice) return;
-      // accumulate per subitem
-      Object.keys(entries).forEach(cat=>{
-        const subObj = entries[cat];
-        if(typeof subObj !== 'object') return;
-        Object.keys(subObj).forEach(sub=>{
-          const qty = Number(subObj[sub]) || 0;
-          if(qty<=0) return;
-          if(filterCategory!=='all' && filterCategory!==cat) return;
-          items.push({ date: dateIso, category: cat, sub, qty, office: officeName, name });
-        });
+    // attach delete handlers
+    salesList.querySelectorAll('button[data-i]').forEach(b=>{
+      b.addEventListener('click', (e)=>{
+        const idx = parseInt(e.target.dataset.i,10);
+        const arr = getSalesForDate(ymd);
+        arr.splice(idx,1);
+        saveSalesForDate(ymd,arr);
+        renderSales(ymd);
       });
-    }catch(e){ /* skip invalid */ }
-  });
-  return items;
-}
-
-/* render salary page based on filters */
-function renderSalaryPage(){
-  populateRatesUI(); populateFilters();
-  // default dates: start/end of current month
-  const now = new Date();
-  if(!q('fromDate').value){ const start = new Date(now.getFullYear(), now.getMonth(), 1); q('fromDate').value = isoDate(start); }
-  if(!q('toDate').value){ const end = new Date(now.getFullYear(), now.getMonth()+1, 0); q('toDate').value = isoDate(end); }
-
-  const from = q('fromDate').value || null;
-  const to = q('toDate').value || null;
-  const cat = q('filterCat').value || 'all';
-  const office = q('filterOffice').value || 'all';
-
-  const items = collectSales(from, to, cat, office);
-  // aggregate: map by cat+sub
-  const agg = {};
-  items.forEach(it=>{
-    const key = `${it.category}||${it.sub}`;
-    if(!agg[key]) agg[key] = { category: it.category, sub: it.sub, qty:0 };
-    agg[key].qty += it.qty;
-  });
-  // build table
-  const body = q('salaryBody'); body.innerHTML = "";
-  let totalSum = 0;
-  Object.values(agg).forEach(row=>{
-    const rate = (rates[row.category] && (rates[row.category][row.sub] !== undefined ? rates[row.category][row.sub] : 0)) || 0;
-    const sum = row.qty * rate; totalSum += sum;
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${row.category}</td><td>${row.sub}</td><td>${row.qty}</td><td>${rate}</td><td>${sum}</td>`;
-    body.appendChild(tr);
-  });
-  q('salaryTotal').textContent = `${totalSum.toLocaleString('ru-RU')} ₽`;
-}
-
-/* events: filters change */
-['fromDate','toDate','filterCat','filterOffice'].forEach(id=> q(id).addEventListener('change', renderSalaryPage));
-q('filterCat').addEventListener('change', ()=> renderSalaryPage());
-q('filterOffice').addEventListener('change', ()=> renderSalaryPage());
-
-/* save calculation snapshot */
-q('saveCalc').addEventListener('click', ()=>{
-  const snapshot = {
-    ts: new Date().toISOString(),
-    from: q('fromDate').value, to: q('toDate').value,
-    cat: q('filterCat').value, office: q('filterOffice').value,
-    rates, total: q('salaryTotal').textContent
+    });
+  }
+  // attach add sale
+  el('addSaleBtn').onclick = ()=> {
+    const title = prompt('Краткое название продажи', 'Продажа');
+    if (title === null) return;
+    const amountRaw = prompt('Сумма продажи (число)', '0');
+    if (amountRaw === null) return;
+    const amount = parseFloat(amountRaw.replace(',','.')) || 0;
+    const note = prompt('Комментарий (необязательно)', '') || '';
+    const arr = getSalesForDate(ymd);
+    arr.push({ title: title.trim(), amount, note });
+    saveSalesForDate(ymd, arr);
+    renderSales(ymd);
   };
-  const prev = loadJSON(KEY_SAVED_CALCS, []);
-  prev.push(snapshot); saveJSON(KEY_SAVED_CALCS, prev);
-  alert('Расчёт сохранён');
-});
-
-/* export CSV */
-q('exportCSV').addEventListener('click', ()=>{
-  const from = q('fromDate').value || null; const to = q('toDate').value || null;
-  const cat = q('filterCat').value || 'all'; const office = q('filterOffice').value || 'all';
-  const items = collectSales(from,to,cat,office);
-  // aggregate per date/category/sub
-  const rows = [];
-  items.forEach(it=> rows.push([it.date, it.office || '', it.category, it.sub, it.qty]));
-  // header
-  let csv = 'Дата;Офис;Категория;Подтип;Кол-во\\n';
-  rows.forEach(r=> csv+= r.map(v=> `"${String(v).replace(/"/g,'""')}"`).join(';') + '\\n');
-  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-  a.download = `zp-${(new Date()).toISOString().slice(0,10)}.csv`; document.body.appendChild(a); a.click(); a.remove();
-});
-
-/* export/import/back-compat helper: some old keys may be stored as sales_YYYY-M-D or iso directly.
-   For writing a day we used localStorage.setItem(currentIso, payload). Keep that behaviour:
-*/
-function saveDayIso(iso, payload){
-  // save at key iso (like "2025-12-04")
-  localStorage.setItem(iso, JSON.stringify(payload));
 }
 
-/* populate filters on load */
-populateFilters();
+/* initial safety/responsiveness */
+window.addEventListener('resize', ()=> {
+  // keep elements within viewport; no-op but placeholder to adjust if needed
+});
 
-/* initial page ready */
-renderSalaryPage();
+// Load profile into UI on start
+loadProfile();
 
-/* quick helper: keyboard escape closes modal */
-window.addEventListener('keydown', (e)=> { if(e.key==='Escape') overlay.classList.remove('show'); });
-
-/* expose a dump for debug (optional) */
-window.__zp = { user, offices, rates, collectSales };
-
-/* done */
 </script>
 </body>
 </html>
