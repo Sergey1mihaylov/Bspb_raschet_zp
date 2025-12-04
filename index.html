@@ -1,1 +1,528 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Зарплата — Банк Санкт-Петербург</title>
+<link rel="icon" href="data:;base64,iVBORw0KGgo=">
+<style>
+  :root{
+    --red:#D32F2F;
+    --navy:#0B2240;
+    --lightblue:#4FA3E9;
+    --white:#FFFFFF;
+    --gap:8px;
+    --nav-height:78px; /* fixed bottom nav height */
+    --header-height:72px;
+  }
+  html,body{height:100%;margin:0;background:var(--white);font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;}
+  .app{height:100vh;display:flex;flex-direction:column;box-sizing:border-box;overflow:hidden;}
+  /* Header */
+  .header{height:var(--header-height);min-height:56px;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(90deg,var(--navy),var(--lightblue));color:var(--white);}
+  .header .title{font-weight:700;font-size:18px;letter-spacing:0.2px;}
+  /* Content area (between header and nav) */
+  .content{flex:1;overflow:hidden;padding:10px;box-sizing:border-box;display:flex;flex-direction:column;}
+  /* Profile */
+  .profile-wrap{display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:flex-start;height:100%;box-sizing:border-box;}
+  .avatar{width:88px;height:88px;border-radius:50%;background:linear-gradient(180deg,var(--white),#f0f0f0);border:3px solid var(--lightblue);display:flex;align-items:center;justify-content:center;overflow:hidden;}
+  .avatar img{width:100%;height:100%;object-fit:cover;display:block;}
+  .profile-form{width:100%;max-width:680px;display:flex;flex-direction:column;gap:8px;}
+  .input,select{width:100%;padding:10px;border-radius:10px;border:1px solid #ddd;font-size:15px;box-sizing:border-box;background:#fff;}
+  .small-row{display:flex;gap:8px;}
+  .btn{padding:10px 14px;border-radius:10px;border:none;background:var(--navy);color:var(--white);font-weight:600;}
+  /* Calendar */
+  .calendar-wrap{width:100%;max-width:900px;margin:0 auto;display:flex;flex-direction:column;align-items:stretch;gap:8px;box-sizing:border-box;height:100%;}
+  .weekdays{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;font-weight:700;color:var(--navy);user-select:none;}
+  .weekdays div{padding:6px 4px;}
+  .dates-grid{flex:1;display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:1fr;gap:6px;box-sizing:border-box;}
+  .date-cell{display:flex;align-items:flex-start;justify-content:center;border-radius:10px;background:#fff;border:1px solid #e6e6e6;cursor:pointer;touch-action:manipulation;user-select:none;padding:6px 4px;font-weight:600;color:var(--navy);}
+  .date-cell:active{transform:scale(0.995);}
+  .date-num{font-size:14px;}
+  /* Modal (popup) */
+  .modal-backdrop{position:fixed;left:0;top:0;width:100vw;height:100vh;display:flex;align-items:center;justify-content:center;z-index:120;}
+  .modal{width:70vw;height:70vh;background:var(--white);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,0.25);display:flex;flex-direction:column;gap:10px;padding:14px;box-sizing:border-box;overflow:auto;}
+  .modal h3{margin:0;font-size:16px;color:var(--navy);}
+  .sales-list{flex:1;overflow:auto;display:flex;flex-direction:column;gap:8px;}
+  .sale-item{padding:8px;border-radius:8px;border:1px solid #eee;background:#fafafa;}
+  .modal .actions{display:flex;gap:8px;justify-content:flex-end;}
+  /* Salary screen */
+  .placeholder{flex:1;display:flex;align-items:center;justify-content:center;color:var(--navy);font-weight:700;font-size:18px;}
+  /* Bottom nav - centered oval with 3 buttons */
+  .bottom-nav{position:fixed;left:50%;transform:translateX(-50%);bottom:12px;height:var(--nav-height);min-height:64px;padding:10px;box-sizing:border-box;z-index:200;display:flex;align-items:center;justify-content:center;}
+  .nav-oval{background:linear-gradient(90deg,var(--white),#f7fbff);border-radius:999px;padding:6px 10px;display:flex;gap:8px;align-items:center;box-shadow:0 6px 20px rgba(11,34,64,0.12);border:2px solid rgba(11,34,64,0.06);}
+  .tab-btn{min-width:84px;padding:10px 14px;border-radius:999px;border:none;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--navy);font-weight:700;cursor:pointer;}
+  .tab-btn.active{background:linear-gradient(90deg,var(--red),#ff6b6b);color:var(--white);box-shadow:0 6px 18px rgba(211,47,47,0.18);}
+  .tab-label{font-size:12px;}
+  /* Ensure no element causes page to scroll horizontally */
+  *{max-width:100%;}
+  /* Responsive tweaks */
+  @media (max-width:420px){
+    .header .title{font-size:16px;}
+    .avatar{width:72px;height:72px;}
+    .tab-btn{min-width:64px;padding:8px 10px;font-size:13px;}
+    .modal{width:86vw;height:72vh;}
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="header">
+    <div class="title" id="headerTitle">Профиль</div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <div id="userNameShort" style="font-weight:600;"></div>
+    </div>
+  </div>
 
+  <div class="content" id="content">
+    <!-- PROFILE -->
+    <div id="screen-profile" class="screen" style="display:flex;flex-direction:column;height:100%;">
+      <div class="profile-wrap" style="padding-top:10px;">
+        <div class="avatar" id="avatarPreview" title="Аватар">
+          <span id="avatarPlaceholder" style="font-weight:700;color:var(--navy);">А</span>
+        </div>
+
+        <div class="profile-form" style="width:100%;padding:0 12px;">
+          <label style="font-weight:700;margin-bottom:4px;">Фамилия и имя</label>
+          <input id="fullName" class="input" placeholder="Иванов Иван" autocomplete="name" />
+
+          <label style="font-weight:700;margin-bottom:4px;">Аватар</label>
+          <div class="small-row">
+            <input id="avatarInput" type="file" accept="image/*" class="input" style="padding:6px;" />
+            <button id="removeAvatar" class="btn" style="background:var(--red);">Удалить</button>
+          </div>
+
+          <label style="font-weight:700;margin-bottom:4px;">Должность</label>
+          <select id="positionSelect" class="input">
+            <option value="">-- Выберите должность --</option>
+            <option value="СЭ">СЭ</option>
+            <option value="АЗ">АЗ</option>
+          </select>
+
+          <label style="font-weight:700;margin-bottom:4px;">Офис</label>
+          <select id="officeSelect" class="input">
+            <option value="">-- Выберите офис --</option>
+            <option value='ДО "Центральный"'>ДО "Центральный"</option>
+          </select>
+
+          <div style="display:flex;gap:8px;margin-top:8px;">
+            <button id="saveProfile" class="btn">Сохранить профиль</button>
+            <button id="clearProfile" class="btn" style="background:#666;color:#fff;">Сброс</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CALENDAR -->
+    <div id="screen-calendar" class="screen" style="display:none;height:100%;">
+      <div class="calendar-wrap">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-weight:800;color:var(--navy);">Календарь</div>
+          <div style="display:flex;gap:8px;">
+            <button id="prevMonth" class="btn" style="background:var(--lightblue);">‹</button>
+            <div id="monthLabel" style="padding:10px 12px;border-radius:8px;background:#fff;border:1px solid #eee;font-weight:700;color:var(--navy);min-width:160px;text-align:center;"></div>
+            <button id="nextMonth" class="btn" style="background:var(--lightblue);">›</button>
+          </div>
+        </div>
+
+        <div class="weekdays" aria-hidden="true">
+          <div>Пн</div><div>Вт</div><div>Ср</div><div>Чт</div><div>Пт</div><div>Сб</div><div>Вс</div>
+        </div>
+
+        <div class="dates-grid" id="datesGrid" role="grid" aria-label="Календарь месяц">
+          <!-- даты генерируются скриптом; строго под днями недели -->
+        </div>
+      </div>
+    </div>
+
+    <!-- SALARY -->
+    <div id="screen-salary" class="screen" style="display:none;height:100%;">
+      <div class="placeholder">Вкладка пока в разработке</div>
+    </div>
+  </div>
+
+  <!-- Bottom nav -->
+  <div class="bottom-nav" aria-hidden="false">
+    <div class="nav-oval" role="tablist" aria-label="Навигация">
+      <button class="tab-btn active" data-screen="profile" id="tab-profile" aria-pressed="true">
+        <div style="font-size:18px;">👤</div>
+        <div class="tab-label">Профиль</div>
+      </button>
+      <button class="tab-btn" data-screen="calendar" id="tab-calendar" aria-pressed="false">
+        <div style="font-size:18px;">📅</div>
+        <div class="tab-label">Календарь</div>
+      </button>
+      <button class="tab-btn" data-screen="salary" id="tab-salary" aria-pressed="false">
+        <div style="font-size:18px;">💰</div>
+        <div class="tab-label">Зарплата</div>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal container (created but hidden) -->
+<div id="modalContainer" style="display:none;"></div>
+
+<script src="prices.js"></script>
+<script>
+/* Приложение: минимальный функционал согласно ТЗ.
+   - Три вкладки внизу, статичны и центрированы.
+   - При первом входе открывается профиль.
+   - Профиль: ФИО, загрузка аватарки, должность (СЭ, АЗ), офис (ДО "Центральный").
+   - Календарь: Пн-Вс сверху, даты строго под ними; при клике дата открывает модальное окно (70% width/height)
+     с списком продаж и кнопкой "Добавить продажу".
+   - Вкладка Зарплата: текст "Вкладка пока в разработке".
+   - Ничего не выходит за экран (используются vw/vh и flex).
+*/
+
+/* --- Хранилище: localStorage --- */
+const STORAGE_PROFILE = 'bspb_profile_v1';
+const STORAGE_SALES = 'bspb_sales_v1';
+
+/* --- Навигация --- */
+const tabs = document.querySelectorAll('.tab-btn');
+const screens = {
+  profile: document.getElementById('screen-profile'),
+  calendar: document.getElementById('screen-calendar'),
+  salary: document.getElementById('screen-salary')
+};
+const headerTitle = document.getElementById('headerTitle');
+const userNameShort = document.getElementById('userNameShort');
+
+tabs.forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const target = btn.dataset.screen;
+    setActiveTab(target);
+  });
+});
+
+function setActiveTab(name){
+  tabs.forEach(t=>{
+    const active = t.dataset.screen === name;
+    t.classList.toggle('active', active);
+    t.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+  Object.keys(screens).forEach(k=>{
+    screens[k].style.display = (k === name) ? 'flex' : 'none';
+  });
+  headerTitle.textContent = name === 'profile' ? 'Профиль' : (name === 'calendar' ? 'Календарь' : 'Зарплата');
+}
+
+/* --- PROFILE --- */
+const fullNameInput = document.getElementById('fullName');
+const positionSelect = document.getElementById('positionSelect');
+const officeSelect = document.getElementById('officeSelect');
+const avatarInput = document.getElementById('avatarInput');
+const avatarPreview = document.getElementById('avatarPreview');
+const avatarPlaceholder = document.getElementById('avatarPlaceholder');
+const saveProfileBtn = document.getElementById('saveProfile');
+const clearProfileBtn = document.getElementById('clearProfile');
+const removeAvatarBtn = document.getElementById('removeAvatar');
+
+function loadProfile(){
+  const raw = localStorage.getItem(STORAGE_PROFILE);
+  if(!raw) return null;
+  try { return JSON.parse(raw); } catch(e){ return null; }
+}
+function saveProfile(profile){
+  localStorage.setItem(STORAGE_PROFILE, JSON.stringify(profile));
+  applyProfileToUI(profile);
+}
+function applyProfileToUI(profile){
+  if(!profile) return;
+  fullNameInput.value = profile.name || '';
+  positionSelect.value = profile.position || '';
+  officeSelect.value = profile.office || '';
+  if(profile.avatar){
+    setAvatar(profile.avatar);
+  } else {
+    clearAvatarUI();
+  }
+  userNameShort.textContent = profile.name ? profile.name.split(' ')[0] : '';
+}
+function clearAvatarUI(){
+  avatarPreview.innerHTML = '<span id="avatarPlaceholder" style="font-weight:700;color:var(--navy);">А</span>';
+}
+function setAvatar(dataUrl){
+  avatarPreview.innerHTML = '';
+  const img = document.createElement('img');
+  img.src = dataUrl;
+  avatarPreview.appendChild(img);
+}
+
+/* Load on start */
+const existingProfile = loadProfile();
+if(existingProfile){
+  applyProfileToUI(existingProfile);
+} else {
+  setActiveTab('profile'); // ensure profile shown on first open
+}
+
+/* Avatar input */
+avatarInput.addEventListener('change', (e)=>{
+  const f = e.target.files && e.target.files[0];
+  if(!f) return;
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    const dataUrl = ev.target.result;
+    // preview and temp store in inputs (not saved to storage until Save)
+    setAvatar(dataUrl);
+    avatarPreview.dataset.pending = dataUrl;
+  };
+  reader.readAsDataURL(f);
+});
+
+removeAvatarBtn.addEventListener('click', ()=>{
+  delete avatarPreview.dataset.pending;
+  clearAvatarUI();
+});
+
+/* Save / Clear */
+saveProfileBtn.addEventListener('click', ()=>{
+  const profile = {
+    name: fullNameInput.value.trim(),
+    position: positionSelect.value,
+    office: officeSelect.value,
+    avatar: avatarPreview.dataset.pending || (loadProfile() && loadProfile().avatar) || null
+  };
+  saveProfile(profile);
+  // feedback: update short name
+  userNameShort.textContent = profile.name ? profile.name.split(' ')[0] : '';
+  // switch to calendar after save
+  setActiveTab('calendar');
+});
+
+clearProfileBtn.addEventListener('click', ()=>{
+  localStorage.removeItem(STORAGE_PROFILE);
+  fullNameInput.value = '';
+  positionSelect.value = '';
+  officeSelect.value = '';
+  delete avatarPreview.dataset.pending;
+  clearAvatarUI();
+  userNameShort.textContent = '';
+});
+
+/* --- CALENDAR --- */
+const datesGrid = document.getElementById('datesGrid');
+const monthLabel = document.getElementById('monthLabel');
+const prevMonthBtn = document.getElementById('prevMonth');
+const nextMonthBtn = document.getElementById('nextMonth');
+
+let viewDate = new Date(); // currently viewed month
+// ensure week starts Monday
+function startOfMonth(d){
+  return new Date(d.getFullYear(), d.getMonth(), 1);
+}
+function buildCalendar(date){
+  datesGrid.innerHTML = '';
+  const year = date.getFullYear(), month = date.getMonth();
+  const firstOfMonth = new Date(year, month, 1);
+  const dayOfWeek = (firstOfMonth.getDay() + 6) % 7; // 0=Mon ... 6=Sun
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+
+  // Month label
+  const opts = {year:'numeric', month:'long'};
+  monthLabel.textContent = firstOfMonth.toLocaleDateString('ru-RU', opts);
+
+  // Add blank cells for previous month (dayOfWeek blanks)
+  for(let i=0;i<dayOfWeek;i++){
+    const empty = document.createElement('div');
+    empty.className = 'date-cell';
+    empty.style.visibility = 'hidden';
+    datesGrid.appendChild(empty);
+  }
+
+  // Add day cells
+  for(let d=1; d<=daysInMonth; d++){
+    const cell = document.createElement('button');
+    cell.className = 'date-cell';
+    cell.type = 'button';
+    const dt = new Date(year, month, d);
+    const iso = dt.toISOString().slice(0,10);
+    cell.dataset.date = iso;
+    const num = document.createElement('div');
+    num.className = 'date-num';
+    num.textContent = String(d);
+    cell.appendChild(num);
+    cell.addEventListener('click', onDateClick);
+    datesGrid.appendChild(cell);
+  }
+
+  // Fill remaining cells to complete last week (so grid always 7 columns per row)
+  const totalCells = datesGrid.children.length;
+  const remainder = totalCells % 7;
+  if(remainder !== 0){
+    const need = 7 - remainder;
+    for(let k=0;k<need;k++){
+      const empty = document.createElement('div');
+      empty.className = 'date-cell';
+      empty.style.visibility = 'hidden';
+      datesGrid.appendChild(empty);
+    }
+  }
+}
+
+/* Date click -> modal with sales list */
+function onDateClick(e){
+  const iso = e.currentTarget.dataset.date;
+  openSalesModal(iso);
+}
+
+/* Sales storage helpers */
+function loadSales(){
+  const raw = localStorage.getItem(STORAGE_SALES);
+  if(!raw) return {};
+  try { return JSON.parse(raw); } catch(e){ return {}; }
+}
+function saveSales(all){
+  localStorage.setItem(STORAGE_SALES, JSON.stringify(all));
+}
+
+/* Modal */
+const modalContainer = document.getElementById('modalContainer');
+function openSalesModal(isoDate){
+  // build modal DOM
+  modalContainer.innerHTML = '';
+  modalContainer.style.display = 'flex';
+  modalContainer.style.alignItems = 'center';
+  modalContainer.style.justifyContent = 'center';
+  modalContainer.style.position = 'fixed';
+  modalContainer.style.left = 0;
+  modalContainer.style.top = 0;
+  modalContainer.style.width = '100vw';
+  modalContainer.style.height = '100vh';
+  modalContainer.style.zIndex = 120;
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.style.background = 'rgba(0,0,0,0.25)';
+  backdrop.addEventListener('click', closeModal);
+
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  modal.addEventListener('click', (ev)=>ev.stopPropagation());
+
+  const h = document.createElement('h3');
+  const pretty = new Date(isoDate).toLocaleDateString('ru-RU', {year:'numeric', month:'2-digit', day:'2-digit'});
+  h.textContent = 'Продажи за ' + pretty;
+  modal.appendChild(h);
+
+  const salesList = document.createElement('div');
+  salesList.className = 'sales-list';
+  modal.appendChild(salesList);
+
+  const actions = document.createElement('div');
+  actions.className = 'actions';
+
+  const addBtn = document.createElement('button');
+  addBtn.className = 'btn';
+  addBtn.textContent = 'Добавить продажу';
+  addBtn.addEventListener('click', ()=>createSale(isoDate, salesList));
+  actions.appendChild(addBtn);
+
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'btn';
+  closeBtn.style.background = 'var(--red)';
+  closeBtn.textContent = 'Закрыть';
+  closeBtn.addEventListener('click', closeModal);
+  actions.appendChild(closeBtn);
+
+  modal.appendChild(actions);
+  backdrop.appendChild(modal);
+  modalContainer.appendChild(backdrop);
+
+  // populate sales list
+  renderSalesForDate(isoDate, salesList);
+}
+
+function closeModal(){
+  modalContainer.innerHTML = '';
+  modalContainer.style.display = 'none';
+}
+
+/* Create sale: simple prompt-based entry (минимально) */
+function createSale(isoDate, container){
+  // minimal entry: сумма и комментарий
+  const amount = prompt('Сумма продажи (руб):');
+  if(amount === null) return;
+  const sum = Number(amount.replace(',', '.'));
+  if(isNaN(sum)){ alert('Неверная сумма'); return; }
+  const comment = prompt('Комментарий (опционально):') || '';
+  const all = loadSales();
+  all[isoDate] = all[isoDate] || [];
+  all[isoDate].push({id:Date.now(), amount: sum, comment: comment});
+  saveSales(all);
+  renderSalesForDate(isoDate, container);
+}
+
+function renderSalesForDate(isoDate, container){
+  container.innerHTML = '';
+  const all = loadSales();
+  const list = all[isoDate] || [];
+  if(list.length === 0){
+    const empty = document.createElement('div');
+    empty.className = 'sale-item';
+    empty.textContent = 'Продаж нет';
+    container.appendChild(empty);
+    return;
+  }
+  list.forEach(s=>{
+    const el = document.createElement('div');
+    el.className = 'sale-item';
+    el.textContent = `${s.amount.toLocaleString('ru-RU')} ₽` + (s.comment ? ' — ' + s.comment : '');
+    // delete button
+    const del = document.createElement('button');
+    del.textContent = 'Удалить';
+    del.style.marginLeft = '8px';
+    del.className = 'btn';
+    del.style.background = '#c0392b';
+    del.style.padding = '6px';
+    del.style.fontSize = '12px';
+    del.addEventListener('click', ()=>{
+      if(!confirm('Удалить запись?')) return;
+      const all2 = loadSales();
+      all2[isoDate] = (all2[isoDate] || []).filter(x=>x.id !== s.id);
+      saveSales(all2);
+      renderSalesForDate(isoDate, container);
+    });
+    const wrapper = document.createElement('div');
+    wrapper.style.display = 'flex';
+    wrapper.style.justifyContent = 'space-between';
+    wrapper.style.alignItems = 'center';
+    const left = document.createElement('div');
+    left.textContent = el.textContent;
+    wrapper.appendChild(left);
+    wrapper.appendChild(del);
+    const node = document.createElement('div');
+    node.className = 'sale-item';
+    node.appendChild(wrapper);
+    container.appendChild(node);
+  });
+}
+
+/* Month navigation */
+prevMonthBtn.addEventListener('click', ()=>{
+  viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth()-1, 1);
+  buildCalendar(viewDate);
+});
+nextMonthBtn.addEventListener('click', ()=>{
+  viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth()+1, 1);
+  buildCalendar(viewDate);
+});
+
+/* Initial build */
+buildCalendar(viewDate);
+
+/* Ensure profile short name updated */
+if(loadProfile()){
+  userNameShort.textContent = (loadProfile().name || '').split(' ')[0] || '';
+}
+
+/* Ensure app never scrolls horizontally, and fits vertically (already via CSS). */
+
+/* Accessibility: keyboard navigation for tabs */
+document.addEventListener('keydown', (e)=>{
+  if(e.key === 'Escape') closeModal();
+});
+</script>
+</body>
+</html>
